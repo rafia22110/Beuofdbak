@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <defs>
+    <radialGradient id="bgGrad192" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1F1F1E" />
+      <stop offset="100%" stop-color="#0B0C0E" />
+    </radialGradient>
+    <radialGradient id="irisGrad192" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#818CF8" />
+      <stop offset="60%" stop-color="#4F46E5" />
+      <stop offset="100%" stop-color="#312E81" />
+    </radialGradient>
+  </defs>
+
+  <rect width="192" height="192" rx="42" fill="url(#bgGrad192)" />
+  <rect width="188" height="188" x="2" y="2" rx="40" fill="none" stroke="#D4AF37" stroke-opacity="0.3" stroke-width="1.5" />
+
+  <circle cx="96" cy="96" r="70" fill="none" stroke="#6366F1" stroke-opacity="0.25" stroke-dasharray="4 6" stroke-width="1.5" />
+  <path d="M 24 96 Q 96 45 168 96 Q 96 147 24 96 Z" fill="#141413" stroke="#FBFBF9" stroke-opacity="0.6" stroke-width="2.5" stroke-linejoin="round" />
+  <circle cx="96" cy="96" r="36" fill="url(#irisGrad192)" />
+  <circle cx="96" cy="96" r="36" fill="none" stroke="#D4AF37" stroke-width="1" stroke-opacity="0.6" />
+  <circle cx="96" cy="96" r="18" fill="#09090C" stroke="#818CF8" stroke-width="1.5" />
+  <circle cx="89" cy="89" r="5" fill="#FFFFFF" opacity="0.95" />
+</svg>

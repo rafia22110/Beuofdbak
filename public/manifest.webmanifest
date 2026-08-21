@@ -1,0 +1,60 @@
+{
+  "id": "com.oculoflow.neuroapp",
+  "name": "OculoFlow — Clinical Pupillometry & Neurofeedback",
+  "short_name": "OculoFlow",
+  "description": "פלטפורמת אימון נוירופידבק מבוססת תנודות אישון (Pupillometry), משחקי Closed-Loop בתלת-ממד, ודוחות השוואה שולשיים בתקן OKF",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
+  "orientation": "portrait-primary",
+  "theme_color": "#FBFBF9",
+  "background_color": "#FBFBF9",
+  "dir": "rtl",
+  "lang": "he",
+  "categories": ["medical", "health", "education", "games"],
+  "icons": [
+    {
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-apple.svg",
+      "sizes": "180x180",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "אימון Focus Runner 3D",
+      "short_name": "Focus 3D",
+      "description": "הפעל אימון קשב ו-ADHD מיד",
+      "url": "/?tab=training&game=runner",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "אימון Zen Garden 3D",
+      "short_name": "Zen 3D",
+      "description": "הפעל אימון הרפיה וחרדה",
+      "url": "/?tab=training&game=garden",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "דוח השוואתי OKF",
+      "short_name": "דוח OKF",
+      "description": "צפה בתוצאות מדידת אישונים",
+      "url": "/?tab=report",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192" }]
+    }
+  ],
+  "prefer_related_applications": false
+}

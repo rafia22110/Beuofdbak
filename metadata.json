@@ -1,0 +1,6 @@
+{
+  "name": "OculoFlow - Pupil-Feedback Neuro Platform",
+  "description": "פלטפורמת אימון נוירופידבק מבוססת תנודות אישון (Pupillometry), משחקי Closed-Loop, ודוחות השוואה שולשיים (3-Way Comparison) בתקן OKF",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

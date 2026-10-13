@@ -1,0 +1,80 @@
+
+                // נירמול היחס לאחוזים בשביל המד החזותי (הנחה: היחס נע בין 0.35 ל 0.55 בממוצע)
+
+                let barPercentage \= ((smoothedRatio \- 0.35) / (0.55 \- 0.35)) \* 100;
+
+                barPercentage \= Math.max(0, Math.min(100, barPercentage));
+
+                tensionBar.style.width \= \`\${barPercentage}%\`;
+
+                
+
+                // החלפת צבע המד אם העומס גבוה
+
+                if(barPercentage \> 60) {
+
+                    tensionBar.className \= "h-full transition-all duration-75 bg-rose-500";
+
+                } else {
+
+                    tensionBar.className \= "h-full transition-all duration-75 bg-emerald-500";
+
+                }
+
+            } else {
+
+                statusText.innerText \= "מחפש עיניים...";
+
+                statusText.classList.replace('text-emerald-400', 'text-rose-400');
+
+            }
+
+            canvasCtx.restore();
+
+        }
+
+        const faceMesh \= new FaceMesh({locateFile: (file) \=\> {
+
+            return \`https\://cdn.jsdelivr.net/npm/@mediapipe/face\_mesh/\${file}\`;
+
+        }});
+
+        faceMesh.setOptions({
+
+            maxNumFaces: 1,
+
+            refineLandmarks: true, // קריטי\! זה מה שמפעיל את זיהוי האישונים (Iris tracking)
+
+            minDetectionConfidence: 0.7,
+
+            minTrackingConfidence: 0.7
+
+        });
+
+        faceMesh.onResults(onResults);
+
+        // הפעלת מצלמת הטלפון/מחשב
+
+        const camera \= new Camera(videoElement, {
+
+            onFrame: async () \=\> {
+
+                await faceMesh.send({image: videoElement});
+
+            },
+
+            width: 600,
+
+            height: 450,
+
+            facingMode: 'user' // מצלמת סלפי קדמית
+
+        });
+
+        camera.start();
+
+    \</script\>
+
+\</body\>
+
+\</html\>

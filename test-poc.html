@@ -1,80 +1,140 @@
-
-                // נירמול היחס לאחוזים בשביל המד החזותי (הנחה: היחס נע בין 0.35 ל 0.55 בממוצע)
-
-                let barPercentage \= ((smoothedRatio \- 0.35) / (0.55 \- 0.35)) \* 100;
-
-                barPercentage \= Math.max(0, Math.min(100, barPercentage));
-
-                tensionBar.style.width \= \`\${barPercentage}%\`;
-
+  function getDistance(p1, p2) {
+            return Math.sqrt(Math.pow(p1[0] - p2[0], 2) + Math.pow(p1[1] - p2[1], 2));
+        }
+        // הגדרת המצלמה והפעלתה
+        async function setupCamera() {
+            statusText.innerText = 'מבקש גישה למצלמה...';
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+                    audio: false
+                });
+                video.srcObject = stream;
                 
+                return new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        // מתאים את הקנבס לגודל הוידאו האמיתי שנטען
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        resolve(video);
+                    };
+                });
+            } catch (error) {
+                statusText.innerText = 'שגיאה בגישה למצלמה. ודא הרשאות (HTTPS נדרש).';
+                console.error(error);
+                throw error;
+            }
+        }
+        // פונקציית הלולאה הראשית שמנתחת כל פריים
+        async function renderPrediction() {
+            try {
+                // העברת הפריים למודל לקבלת תחזיות
+                const predictions = await model.estimateFaces({
+                    input: video,
+                    returnTensors: false,
+                    flipHorizontal: false, // אנחנו הופכים ב-CSS
+                    predictIrises: true // קריטי! דורש זיהוי קשתית
+                });
+              // ניקוי הקנבס לציור מחדש
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                // החלפת צבע המד אם העומס גבוה
 
-                if(barPercentage \> 60) {
+                if (predictions.length > 0) {
+                    statusText.innerText = 'זיהוי פנים פעיל. עוקב אחר אישונים.';
+                    statusText.style.color = '#00ff00';
 
-                    tensionBar.className \= "h-full transition-all duration-75 bg-rose-500";
+
+                    // עובדים על הפנים הראשונות שזוהו
+                    const keypoints = predictions[0].scaledMesh;
+
+
+                    // אינדקסים לפי המודל של FaceMesh
+                    // עין ימין (של המשתמש) - הזוויות החיצונית והפנימית
+                    const RIGHT_EYE_LEFT_CORNER = 133;
+                    const RIGHT_EYE_RIGHT_CORNER = 33;
+                   
+                    // אישון ימין - נקודת המרכז (לפי Annotations)
+                    // כדי לחשב את קוטר האישון, ניקח את הרוחב של הקשתית (Iris) שזוהתה
+                    let irisWidth = 0;
+                   
+                    if(predictions[0].annotations && predictions[0].annotations.rightEyeIris) {
+                        const rightIrisPoints = predictions[0].annotations.rightEyeIris;
+                       
+                        // מצייר את האישון להמחשה
+                        ctx.fillStyle = '#00ffff';
+                        for (let i = 0; i < rightIrisPoints.length; i++) {
+                            const point = rightIrisPoints[i];
+                            ctx.beginPath();
+                            ctx.arc(point[0], point[1], 2, 0, 2 * Math.PI);
+                            ctx.fill();
+                        }
+                       
+                        // חישוב רוחב הקשתית (נקודה שמאלית פחות ימנית של הקשתית)
+                        irisWidth = getDistance(rightIrisPoints[0], rightIrisPoints[2]);
+                    }
+
+
+                    // ציור נקודות קצוות העין
+                    ctx.fillStyle = '#ff0000';
+                    ctx.beginPath(); ctx.arc(keypoints[RIGHT_EYE_LEFT_CORNER][0], keypoints[RIGHT_EYE_LEFT_CORNER][1], 3, 0, 2 * Math.PI); ctx.fill();
+                    ctx.beginPath(); ctx.arc(keypoints[RIGHT_EYE_RIGHT_CORNER][0], keypoints[RIGHT_EYE_RIGHT_CORNER][1], 3, 0, 2 * Math.PI); ctx.fill();
+
+
+                    // חישוב רוחב העין כולה
+                    const eyeWidth = getDistance(keypoints[RIGHT_EYE_LEFT_CORNER], keypoints[RIGHT_EYE_RIGHT_CORNER]);
+
+
+                    // חישוב היחס והצגתו
+                    if (eyeWidth > 0 && irisWidth > 0) {
+                        const currentRatio = irisWidth / eyeWidth;
+                        ratioDisplay.innerText = currentRatio.toFixed(4);
+                    } else {
+                        ratioDisplay.innerText = "מחפש אישון...";
+                    }
+
 
                 } else {
-
-                    tensionBar.className \= "h-full transition-all duration-75 bg-emerald-500";
-
+                    statusText.innerText = 'לא זוהו פנים בבירור.';
+                    statusText.style.color = '#ffaa00';
+                    ratioDisplay.innerText = "--.----";
                 }
-
-            } else {
-
-                statusText.innerText \= "מחפש עיניים...";
-
-                statusText.classList.replace('text-emerald-400', 'text-rose-400');
-
+            } catch (e) {
+                console.error("שגיאה בניתוח הפריים:", e);
             }
 
-            canvasCtx.restore();
 
+            // קריאה חוזרת ללולאה בפריים הבא
+            requestAnimationFrame(renderPrediction);
         }
 
-        const faceMesh \= new FaceMesh({locateFile: (file) \=\> {
 
-            return \`https\://cdn.jsdelivr.net/npm/@mediapipe/face\_mesh/\${file}\`;
+        // אתחול המערכת
+        async function main() {
+            try {
+                await setupCamera();
+                video.play();
+               
+                statusText.innerText = 'טוען מודל רשת נוירונים (זה עשוי לקחת רגע)...';
+                // טעינת המודל עם חבילת ה-Iris
+                model = await faceLandmarksDetection.load(
+                    faceLandmarksDetection.SupportedPackages.mediapipeFacemesh,
+                    { maxFaces: 1 }
+                );
+               
+                statusText.innerText = 'המודל נטען. מתחיל ניתוח.';
+                renderPrediction();
 
-        }});
 
-        faceMesh.setOptions({
+            } catch (e) {
+                statusText.innerText = 'התרחשה שגיאה בהפעלת המערכת.';
+                statusText.style.color = 'red';
+                console.error(e);
+            }
+        }
 
-            maxNumFaces: 1,
 
-            refineLandmarks: true, // קריטי\! זה מה שמפעיל את זיהוי האישונים (Iris tracking)
-
-            minDetectionConfidence: 0.7,
-
-            minTrackingConfidence: 0.7
-
-        });
-
-        faceMesh.onResults(onResults);
-
-        // הפעלת מצלמת הטלפון/מחשב
-
-        const camera \= new Camera(videoElement, {
-
-            onFrame: async () \=\> {
-
-                await faceMesh.send({image: videoElement});
-
-            },
-
-            width: 600,
-
-            height: 450,
-
-            facingMode: 'user' // מצלמת סלפי קדמית
-
-        });
-
-        camera.start();
-
-    \</script\>
-
-\</body\>
-
-\</html\>
+        // הפעלה כשהדף נטען
+        window.onload = main;
+    </script>
+</body>
+</html>

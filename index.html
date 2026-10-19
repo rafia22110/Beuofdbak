@@ -1,41 +1,570 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="he" dir="rtl">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover, user-scalable=yes" />
-    <title>OculoFlow — Clinical Pupillometry & Neurofeedback</title>
-    <meta name="description" content="OculoFlow — Closed-Loop Pupil-Feedback Neuro-Platform & 3-Way OKF Clinical Reports" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beuofdbak - מבחן אלפא קליני (V3)</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@3.11.0/dist/tf-core.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter@3.11.0/dist/tf-converter.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@3.11.0/dist/tf-backend-webgl.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection@0.0.3/dist/face-landmarks-detection.min.js"></script>
 
-    <!-- Web App Manifest for Android & Store Packaging (TWA/PWA/Capacitor) -->
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <style>
+        body {
+            background-color: #0b0f19;
+            color: #e2e8f0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            transition: background-color 0.4s ease, color 0.4s ease;
+        }
+        /* מצב מסך לבן לבדיקת רפלקס האור של האישון */
+        body.light-reflex-mode {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+        }
+        .video-box {
+            position: relative;
+            width: 100%;
+            max-width: 480px;
+            aspect-ratio: 4/3;
+            background: #000;
+            border-radius: 1rem;
+            overflow: hidden;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
+            border: 2px solid #1e293b;
+        }
+        #video {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+            opacity: 0.35;
+        }
+        #canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            transform: scaleX(-1);
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-between p-4 md:p-6 select-none">
 
-    <!-- Android & Chrome WebApp Capabilities -->
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="application-name" content="OculoFlow" />
-    <meta name="theme-color" content="#FBFBF9" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#09090C" media="(prefers-color-scheme: dark)" />
+    <header class="w-full max-w-xl flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
+        <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold">B</div>
+            <div>
+                <h1 class="text-lg font-bold tracking-tight">Beuofdbak <span class="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-mono">Alpha v3.0</span></h1>
+                <p class="text-xs text-slate-400">פרוטוקול בדיקת היתכנות וכיול מכשירים</p>
+            </div>
+        </div>
+        <div id="connection-badge" class="text-xs font-mono px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            ממתין להתחלה
+        </div>
+    </header>
 
-    <!-- iOS Apple WebApp & App Store Capabilities -->
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="OculoFlow" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/icon-apple.svg" />
-    <link rel="icon" type="image/svg+xml" sizes="192x192" href="/icon-192.svg" />
-    <link rel="icon" type="image/svg+xml" sizes="512x512" href="/icon-512.svg" />
+    <main class="w-full max-w-xl flex-1 flex flex-col items-center justify-center">
+        
+        <!-- שלב 1: מסך נחיתה והגדרות נבדק -->
+        <section id="screen-welcome" class="w-full bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+            <div class="space-y-2">
+                <h2 class="text-xl font-bold text-white">ברוכים הבאים למעבדת הניסוי 🧠👁️</h2>
+                <p class="text-sm text-slate-300 leading-relaxed">
+                    מטרת הניסוי (60 שניות) היא לבדוק האם מצלמת המכשיר שלך מצליחה לזהות שינויים זעירים בקוטר האישון כתגובה למאמץ מחשבתי ולשינויי תאורה.
+                </p>
+                <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3 text-xs text-slate-400 space-y-1">
+                    <div class="font-semibold text-emerald-400 mb-1">🔒 הצהרת פרטיות מלאה (On-Device):</div>
+                    <p>• שום תמונה או וידאו אינם נשמרים או נשלחים לשרת.</p>
+                    <p>• המערכת מפיקה רק ממוצעים מתמטיים של יחס האישון לצורך כיול מדעי.</p>
+                </div>
+            </div>
 
-    <!-- Security & Device Capabilities -->
-    <meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
-    <meta name="msapplication-TileColor" content="#FBFBF9" />
-    <meta name="msapplication-tap-highlight" content="no" />
+            <!-- פרטי מטא-דאטה להשוואה בין אנשים -->
+            <div class="space-y-4 pt-2 border-t border-slate-800">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1.5">1. כינוי או שם (אופציונלי - לזיהוי הדוח):</label>
+                    <input type="text" id="input-tester-name" placeholder="למשל: דניאל - אייפון 15" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
 
-    <!-- Editorial Typography Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@300;400;500;700;900&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&family=Cinzel:wght@400;600;700&display=swap" rel="stylesheet">
-  </head>
-  <body class="bg-[#FBFBF9] text-[#141413] antialiased selection:bg-stone-900 selection:text-[#FBFBF9] overscroll-none touch-manipulation">
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1.5">2. צבע עיניים (קריטי לכיול):</label>
+                        <select id="input-eye-color" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                            <option value="brown_dark">חום כהה / שחור</option>
+                            <option value="brown_light">חום בהיר / דבש</option>
+                            <option value="green">ירוק</option>
+                            <option value="blue_grey">כחול / אפור</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1.5">3. תנאי תאורה בחדר כרגע:</label>
+                        <select id="input-lighting" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                            <option value="indoor_normal">תאורת חדר רגילה</option>
+                            <option value="dim_dark">חדר חשוך / עמום</option>
+                            <option value="bright_sun">מואר מאוד / אור יום</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1.5">4. הרכבת משקפיים / עדשות:</label>
+                    <select id="input-glasses" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                        <option value="none">ללא משקפיים / ללא עדשות</option>
+                        <option value="glasses">מרכיב/ה משקפיים כרגע</option>
+                        <option value="contacts">עם עדשות מגע</option>
+                    </select>
+                </div>
+            </div>
+
+            <button id="btn-init-camera" onclick="initializeSystem()" class="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-slate-950 font-bold rounded-xl shadow-lg transition transform active:scale-95">
+                הפעל מצלמה והתחל בכיול 📷
+            </button>
+        </section>
+
+        <!-- שלב 2: מסך הניסוי הפעיל -->
+        <section id="screen-test" class="w-full hidden flex-col items-center space-y-4">
+            
+            <!-- תיבת הנחיות דינמית למשתמש -->
+            <div id="protocol-banner" class="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 text-center shadow-md transition-all">
+                <div class="text-xs uppercase tracking-wider text-emerald-400 font-semibold mb-1" id="phase-title">שלב הכנה</div>
+                <div class="text-base md:text-lg font-bold" id="phase-instruction">מקם את הפנים במרכז המצלמה והמתן לזיהוי יציב</div>
+                <div class="mt-2 text-2xl font-mono font-extrabold text-cyan-400 hidden" id="phase-timer">20s</div>
+            </div>
+
+            <!-- קנבס המצלמה -->
+            <div class="video-box">
+                <video id="video" playsinline autoplay muted></video>
+                <canvas id="canvas"></canvas>
+                
+                <!-- חיווי איכות זיהוי על גבי הוידאו -->
+                <div class="absolute top-3 right-3 z-20 bg-slate-950/80 backdrop-blur px-3 py-1 rounded-full border border-slate-800 flex items-center gap-2">
+                    <span id="tracking-dot" class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+                    <span id="tracking-status" class="text-xs font-mono text-slate-200">טוען מודל...</span>
+                </div>
+
+                <!-- תצוגת תרגיל מתמטי או גירוי במרכז המסך בזמן הניסוי -->
+                <div id="stimulus-overlay" class="absolute inset-0 z-20 hidden flex-col items-center justify-center bg-slate-950/40 backdrop-blur-[2px] p-4 text-center">
+                    <div id="stimulus-content" class="text-3xl font-extrabold text-white drop-shadow-lg bg-slate-900/90 border border-slate-700 px-6 py-4 rounded-2xl"></div>
+                </div>
+            </div>
+
+            <!-- פאנל מדדים חיים -->
+            <div class="w-full bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex justify-between items-center">
+                <div>
+                    <div class="text-xs text-slate-400">יחס אישון/עין (מנורמל מרחק):</div>
+                    <div id="live-ratio" class="text-3xl font-mono font-bold text-emerald-400">--.----</div>
+                </div>
+                <div class="text-left">
+                    <div class="text-xs text-slate-400">דגימות שנאספו:</div>
+                    <div id="sample-counter" class="text-xl font-mono text-slate-200">0</div>
+                </div>
+            </div>
+
+            <!-- כפתור התחלת פרוטוקול 60 שניות (מופיע רק אחרי שהמודל מזהה פנים) -->
+            <button id="btn-start-protocol" onclick="startProtocol()" disabled class="w-full py-4 bg-slate-800 text-slate-500 font-bold rounded-xl transition cursor-not-allowed">
+                ממתין לזיהוי פנים יציב...
+            </button>
+        </section>
+
+        <!-- שלב 3: מסך סיכום ושליחת תוצאות -->
+        <section id="screen-results" class="w-full hidden bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+            <div class="text-center space-y-1">
+                <div class="inline-flex p-3 rounded-full bg-emerald-500/20 text-emerald-400 mb-2 text-2xl">✅</div>
+                <h2 class="text-2xl font-bold text-white">הבדיקה הושלמה בהצלחה!</h2>
+                <p class="text-xs text-slate-400">הנה ניתוח הנתונים שנאספו מהמכשיר שלך:</p>
+            </div>
+
+            <!-- כרטיסי תוצאות של שלושת השלבים -->
+            <div class="grid grid-cols-3 gap-2 text-center">
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                    <div class="text-[11px] text-slate-400">א. מנוחה (Baseline)</div>
+                    <div id="res-baseline" class="text-lg font-mono font-bold text-slate-200 mt-1">0.000</div>
+                </div>
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                    <div class="text-[11px] text-amber-400">ב. מאמץ קוגניטיבי</div>
+                    <div id="res-stress" class="text-lg font-mono font-bold text-amber-300 mt-1">0.000</div>
+                    <div id="res-stress-delta" class="text-[10px] font-mono text-slate-400">--%</div>
+                </div>
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                    <div class="text-[11px] text-cyan-400">ג. רפלקס אור בוהק</div>
+                    <div id="res-light" class="text-lg font-mono font-bold text-cyan-300 mt-1">0.000</div>
+                    <div id="res-light-delta" class="text-[10px] font-mono text-slate-400">--%</div>
+                </div>
+            </div>
+
+            <!-- חיווי אמינות (OKF Validation) -->
+            <div id="okf-verdict" class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-xs leading-relaxed"></div>
+
+            <!-- תיבת ה-JSON לשיתוף -->
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">חבילת נתונים גולמיים (טלמטריה לפיתוח):</label>
+                <textarea id="json-output" readonly rows="4" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-[11px] font-mono text-emerald-400 focus:outline-none"></textarea>
+            </div>
+
+            <!-- כפתורי שיתוף ושידור -->
+            <div class="space-y-2.5 pt-2">
+                <button onclick="shareViaWhatsApp()" class="w-full py-3.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition">
+                    <span>שלח תוצאות בדיקה בוואטסאפ</span>
+                    <span>📲</span>
+                </button>
+                
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="copyTelemetry()" id="btn-copy" class="py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl transition">
+                        📋 העתק נתונים (JSON)
+                    </button>
+                    <button onclick="location.reload()" class="py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-semibold rounded-xl transition">
+                        🔄 הרץ בדיקה חדשה
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="w-full max-w-xl text-center text-[11px] text-slate-600 mt-6">
+        DUPAMAN Ecosystem • Beuofdbak Alpha Telemetry Module
+    </footer>
+
+    <script>
+        // אלמנטים מרכזיים
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const liveRatioEl = document.getElementById('live-ratio');
+        const sampleCounterEl = document.getElementById('sample-counter');
+        const trackingDot = document.getElementById('tracking-dot');
+        const trackingStatus = document.getElementById('tracking-status');
+        const btnStartProtocol = document.getElementById('btn-start-protocol');
+
+        let model = null;
+        let isTracking = false;
+        let smoothedRatio = 0;
+        let totalSamples = 0;
+
+        // ניהול שלבי הפרוטוקול הקליני
+        let currentPhase = 'IDLE'; // IDLE, BASELINE, STRESS, LIGHT, DONE
+        let phaseData = {
+            BASELINE: [],
+            STRESS: [],
+            LIGHT: []
+        };
+        let frameTimestamps = [];
+
+        // אופציונלי: אם תרצה בעתיד שהתוצאות יישלחו אוטומטית ל-Google Sheets או Make.com ללא התערבות המשתמש, הכנס כאן URL של Webhook
+        const AUTO_WEBHOOK_URL = ""; 
+
+        // פונקציית מרחק אוקלידי
+        function getDistance(p1, p2) {
+            return Math.sqrt(Math.pow(p1[0] - p2[0], 2) + Math.pow(p1[1] - p2[1], 2));
+        }
+
+        // מעבר ממסך נחיתה והפעלת מצלמה
+        async function initializeSystem() {
+            const btnInit = document.getElementById('btn-init-camera');
+            btnInit.disabled = true;
+            btnInit.innerText = "מבקש הרשאת מצלמה וטוען מודל AI...";
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+                    audio: false
+                });
+                video.srcObject = stream;
+
+                await new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        resolve();
+                    };
+                });
+                video.play();
+
+                // החלפת מסכים
+                document.getElementById('screen-welcome').classList.add('hidden');
+                const testScreen = document.getElementById('screen-test');
+                testScreen.classList.remove('hidden');
+                testScreen.classList.add('flex');
+
+                document.getElementById('connection-badge').innerText = "טוען רשת נוירונים...";
+
+                // טעינת מודל ה-Iris של TensorFlow
+                model = await faceLandmarksDetection.load(
+                    faceLandmarksDetection.SupportedPackages.mediapipeFacemesh,
+                    { maxFaces: 1 }
+                );
+
+                document.getElementById('connection-badge').innerText = "מערכת פעילה";
+                document.getElementById('connection-badge').className = "text-xs font-mono px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+                
+                renderPrediction();
+
+            } catch (err) {
+                console.error(err);
+                btnInit.disabled = false;
+                btnInit.innerText = "שגיאה בגישה למצלמה - נסה שוב (ודא HTTPS)";
+                btnInit.className = "w-full py-3.5 bg-rose-600 text-white font-bold rounded-xl";
+            }
+        }
+
+        async function renderPrediction() {
+            const now = performance.now();
+            frameTimestamps.push(now);
+            if (frameTimestamps.length > 30) frameTimestamps.shift();
+
+            try {
+                const predictions = await model.estimateFaces({
+                    input: video,
+                    returnTensors: false,
+                    flipHorizontal: false,
+                    predictIrises: true
+                });
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                if (predictions.length > 0 && predictions[0].annotations && predictions[0].annotations.rightEyeIris) {
+                    const keypoints = predictions[0].scaledMesh;
+                    const rightIris = predictions[0].annotations.rightEyeIris;
+                    const leftIris = predictions[0].annotations.leftEyeIris;
+
+                    // ציור נקודות הקשתית/אישון על הקנבס
+                    ctx.fillStyle = '#00ffcc';
+                    rightIris.concat(leftIris).forEach(pt => {
+                        ctx.beginPath();
+                        ctx.arc(pt[0], pt[1], 2.2, 0, 2 * Math.PI);
+                        ctx.fill();
+                    });
+
+                    // מדידת עין ימין
+                    const rEyeWidth = getDistance(keypoints[133], keypoints[33]);
+                    const rIrisWidth = getDistance(rightIris[0], rightIris[2]);
+                    const rRatio = rEyeWidth > 0 ? (rIrisWidth / rEyeWidth) : 0;
+
+                    // מדידת עין שמאל (לשיפור היציבות באמצעות ממוצע שתי העיניים)
+                    const lEyeWidth = getDistance(keypoints[362], keypoints[263]);
+                    const lIrisWidth = getDistance(leftIris[0], leftIris[2]);
+                    const lRatio = lEyeWidth > 0 ? (lIrisWidth / lEyeWidth) : 0;
+
+                    // ממוצע שתי העיניים
+                    const rawRatio = (rRatio + lRatio) / 2;
+
+                    if (rawRatio > 0.15 && rawRatio < 0.75) {
+                        // החלקת קפיצות קלות (Exponential Moving Average)
+                        smoothedRatio = smoothedRatio === 0 ? rawRatio : (smoothedRatio * 0.8) + (rawRatio * 0.2);
+                        liveRatioEl.innerText = smoothedRatio.toFixed(4);
+                        totalSamples++;
+                        sampleCounterEl.innerText = totalSamples;
+
+                        // עדכון סטטוס זיהוי חיובי
+                        if (!isTracking) {
+                            isTracking = true;
+                            trackingDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400";
+                            trackingStatus.innerText = "נעול על האישון";
+                            if (currentPhase === 'IDLE') {
+                                btnStartProtocol.disabled = false;
+                                btnStartProtocol.innerText = "התחל פרוטוקול בדיקה (60 שניות) ▶️";
+                                btnStartProtocol.className = "w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl shadow-lg transition cursor-pointer";
+                            }
+                        }
+
+                        // שמירת הנתון לשלב הפעיל בניסוי
+                        if (currentPhase === 'BASELINE' || currentPhase === 'STRESS' || currentPhase === 'LIGHT') {
+                            phaseData[currentPhase].push(rawRatio);
+                        }
+                    }
+                } else {
+                    isTracking = false;
+                    trackingDot.className = "w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping";
+                    trackingStatus.innerText = "מחפש עיניים...";
+                }
+            } catch (e) {
+                console.error("Frame error:", e);
+            }
+
+            if (currentPhase !== 'DONE') {
+                requestAnimationFrame(renderPrediction);
+            }
+        }
+
+        function startProtocol() {
+            btnStartProtocol.classList.add('hidden');
+            const timerEl = document.getElementById('phase-timer');
+            const titleEl = document.getElementById('phase-title');
+            const instrEl = document.getElementById('phase-instruction');
+            const overlay = document.getElementById('stimulus-overlay');
+            const stimulusContent = document.getElementById('stimulus-content');
+
+            timerEl.classList.remove('hidden');
+
+            // שלב 1: מנוחה וכיול (15 שניות)
+            runPhase('BASELINE', 15, () => {
+                titleEl.innerText = "שלב 1 מתוך 3: כיול מנוחה (Baseline)";
+                instrEl.innerText = "הבט בנקודה הירוקה במרכז המסך ונשום רגיל ורגוע";
+                overlay.classList.remove('hidden');
+                overlay.classList.add('flex');
+                stimulusContent.innerHTML = `<div class="w-6 h-6 rounded-full bg-emerald-400 mx-auto animate-pulse"></div><div class="text-xs text-slate-300 mt-2 font-normal">התמקד בנקודה</div>`;
+            }, () => {
+                // שלב 2: עומס קוגניטיבי (20 שניות)
+                runPhase('STRESS', 20, () => {
+                    titleEl.innerText = "שלב 2 מתוך 3: גיוס מאמץ קוגניטיבי";
+                    instrEl.innerText = "חשב בראש מהר ככל האפשר (בלי להזיז את המבט מהמסך!):";
+                    stimulusContent.innerHTML = `<div class="text-amber-400 text-2xl mb-1">300 פחות 7?</div><div class="text-sm font-normal text-slate-200">המשך לחסר 7 אחורה בראש: 293, 286...</div>`;
+                }, () => {
+                    // שלב 3: רפלקס האור (15 שניות) - בדיקת אמיתות החיישן
+                    runPhase('LIGHT', 15, () => {
+                        document.body.classList.add('light-reflex-mode');
+                        titleEl.innerText = "שלב 3 מתוך 3: בדיקת רפלקס האור (OKF)";
+                        instrEl.innerText = "המסך מואר בעוצמה כדי לבדוק כיווץ אישון טבעי. המשך להביט למצלמה.";
+                        stimulusContent.innerHTML = `<div class="text-cyan-400 text-xl">☀️ בדיקת תגובת אור</div>`;
+                    }, () => {
+                        // סיום הפרוטוקול
+                        document.body.classList.remove('light-reflex-mode');
+                        finishProtocol();
+                    });
+                });
+            });
+        }
+
+        function runPhase(phaseName, seconds, onStart, onComplete) {
+            currentPhase = phaseName;
+            onStart();
+            let remaining = seconds;
+            const timerEl = document.getElementById('phase-timer');
+            timerEl.innerText = `${remaining}s`;
+
+            const interval = setInterval(() => {
+                remaining--;
+                timerEl.innerText = `${remaining}s`;
+                if (remaining <= 0) {
+                    clearInterval(interval);
+                    onComplete();
+                }
+            }, 1000);
+        }
+
+        function calcStats(arr) {
+            if (!arr || arr.length === 0) return { mean: 0, sd: 0, count: 0 };
+            const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+            const variance = arr.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / arr.length;
+            return {
+                mean: Number(mean.toFixed(4)),
+                sd: Number(Math.sqrt(variance).toFixed(4)),
+                count: arr.length
+            };
+        }
+
+        function finishProtocol() {
+            currentPhase = 'DONE';
+            // עצירת המצלמה לחיסכון בסוללה
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
+
+            document.getElementById('screen-test').classList.add('hidden');
+            document.getElementById('screen-results').classList.remove('hidden');
+
+            const baseStats = calcStats(phaseData.BASELINE);
+            const stressStats = calcStats(phaseData.STRESS);
+            const lightStats = calcStats(phaseData.LIGHT);
+
+            // חישוב אחוזי שינוי (דלתא) ביחס למנוחה
+            const stressDeltaPct = baseStats.mean > 0 ? (((stressStats.mean - baseStats.mean) / baseStats.mean) * 100).toFixed(1) : 0;
+            const lightDeltaPct = baseStats.mean > 0 ? (((lightStats.mean - baseStats.mean) / baseStats.mean) * 100).toFixed(1) : 0;
+
+            // הצגה בממשק
+            document.getElementById('res-baseline').innerText = baseStats.mean;
+            document.getElementById('res-stress').innerText = stressStats.mean;
+            document.getElementById('res-stress-delta').innerText = `stressDeltaPct>0?'+':''{stressDeltaPct}% מול מנוחה`;
+            document.getElementById('res-light').innerText = lightStats.mean;
+            document.getElementById('res-light-delta').innerText = `lightDeltaPct>0?'+':''{lightDeltaPct}% מול מנוחה`;
+
+            // חישוב קצב פריימים (FPS) להערכת חוזק המכשיר
+            let fps = 0;
+            if (frameTimestamps.length > 2) {
+                const durationSec = (frameTimestamps[frameTimestamps.length - 1] - frameTimestamps[0]) / 1000;
+                fps = Math.round(frameTimestamps.length / durationSec);
+            }
+
+            // הערכת אמיתות (OKF Verdict)
+            const verdictEl = document.getElementById('okf-verdict');
+            const totalCaptured = baseStats.count + stressStats.count + lightStats.count;
+            if (totalCaptured < 30) {
+                verdictEl.innerHTML = `<span class="text-rose-400 font-bold">⚠️ איכות דגימה נמוכה:</span> המצלמה התקשתה לעקוב באופן רציף. מומלץ לשפר תאורה על הפנים.`;
+            } else if (lightStats.mean < baseStats.mean) {
+                verdictEl.innerHTML = `<span class="text-emerald-400 font-bold">✅ אימות חיובי (OKF Passed):</span> זוהתה תגובת כיווץ באור ושינוי במאמץ. המכשיר וצבע העין מתאימים למדידה.`;
+            } else {
+                verdictEl.innerHTML = `<span class="text-amber-400 font-bold">🔍 רגישות חלקית:</span> המודל מזהה את הקשתית, אך תגובת האישון הפנימי לאור החזק הייתה חלשה (נפוץ בעיניים כהות מאוד או בחדר מואר מדי).`;
+            }
+
+            // בניית אובייקט הטלמטריה המלא
+            const telemetryPayload = {
+                test_id: "ALPHA-" + Math.random().toString(36).substring(2, 7).toUpperCase(),
+                timestamp: new Date().toISOString(),
+                tester: document.getElementById('input-tester-name').value || "Anonymous",
+                profile: {
+                    eye_color: document.getElementById('input-eye-color').value,
+                    lighting: document.getElementById('input-lighting').value,
+                    glasses: document.getElementById('input-glasses').value
+                },
+                device: {
+                    user_agent: navigator.userAgent,
+                    screen: `window.screen.widthx{window.screen.height}`,
+                    video_res: `canvas.widthx{canvas.height}`,
+                    estimated_fps: fps
+                },
+                metrics: {
+                    baseline: baseStats,
+                    cognitive_stress: stressStats,
+                    light_reflex: lightStats,
+                    stress_delta_pct: Number(stressDeltaPct),
+                    light_delta_pct: Number(lightDeltaPct)
+                }
+            };
+
+            const jsonStr = JSON.stringify(telemetryPayload, null, 2);
+            document.getElementById('json-output').value = jsonStr;
+
+            // אם הוגדר Webhook, שדר אוטומטית ברקע
+            if (AUTO_WEBHOOK_URL) {
+                fetch(AUTO_WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: jsonStr
+                }).catch(e => console.warn("Webhook send failed:", e));
+            }
+        }
+
+        // פונקציות שיתוף התוצאות בקלות
+        function copyTelemetry() {
+            const textarea = document.getElementById('json-output');
+            textarea.select();
+            document.execCommand('copy');
+            const btn = document.getElementById('btn-copy');
+            btn.innerText = "✅ הועתק ללוח!";
+            setTimeout(() => { btn.innerText = "📋 העתק נתונים (JSON)"; }, 2500);
+        }
+
+        function shareViaWhatsApp() {
+            const rawJson = document.getElementById('json-output').value;
+            const data = JSON.parse(rawJson);
+            const summaryText = `*דוח בדיקת אלפא - Beuofdbak* 👁️\n` +
+                `נבדק: data.tester({data.test_id})\n` +
+                `צבע עין: ${data.profile.eye_color} | תאורה: ${data.profile.lighting}\n` +
+                `קצב מצלמה: ${data.device.estimated_fps} FPS\n` +
+                `---\n` +
+                `• מנוחה: ${data.metrics.baseline.mean} (SD: ${data.metrics.baseline.sd})\n` +
+                `• מאמץ קוגניטיבי: data.metrics.cognitivestress.mean({data.metrics.stress_delta_pct}%)\n` +
+                `• רפלקס אור: data.metrics.lightreflex.mean({data.metrics.light_delta_pct}%)\n` +
+                `---\n` +
+                `JSON:\n${rawJson}`;
+
+            const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(summaryText)}`;
+            window.open(waUrl, '_blank');
+        }
+    </script>
+</body>
 </html>
 

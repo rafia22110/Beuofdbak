@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Beuofdbak - מעבדת אלפא קלינית (V4)</title>
+    <title>Beuofdbak - מעבדת אלפא קלינית (V4.1)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@3.11.0/dist/tf-core.min.js"></script>
@@ -25,7 +25,7 @@
         .video-box {
             position: relative;
             width: 100%;
-            max-width: 460px;
+            max-width: 440px;
             aspect-ratio: 4/3;
             background: #000;
             border-radius: 1rem;
@@ -48,40 +48,106 @@
             transform: scaleX(-1);
             z-index: 10;
         }
-        /* קנבס מוגדל שמציג למשתמש את החיתוך החי של האישון שלו */
+        /* קנבס זום אישון מוגדל בחלק העליון של המסך */
         #eye-zoom-canvas {
-            width: 72px;
-            height: 72px;
-            border-radius: 0.75rem;
-            border: 2px solid #10b981;
+            width: 112px;
+            height: 112px;
+            border-radius: 9999px;
+            border: 3px solid #10b981;
             background: #000;
             image-rendering: pixelated;
+            box-shadow: 0 0 25px rgba(16, 185, 129, 0.35);
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center justify-between p-4 md:p-6 select-none">
+<body class="min-h-screen flex flex-col items-center justify-between p-3 md:p-5 select-none">
 
-    <header class="w-full max-w-xl flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
-        <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold">B</div>
-            <div>
-                <h1 class="text-lg font-bold tracking-tight">Beuofdbak <span class="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full font-mono">Alpha v4.0</span></h1>
-                <p class="text-xs text-slate-400">מנוע Dark-Pixel Pupillometry + מיקרו-תנודות</p>
+    <!-- מסך 2: זירה פעילה (מוצמד לחלק העליון ביותר של המסך לקו ראייה ישיר למצלמה!) -->
+    <main class="w-full max-w-xl flex-1 flex flex-col items-center justify-start">
+
+        <!-- אזור מיקוד עליון קבוע (צמוד למצלמת הסלפי) -->
+        <section id="screen-test" class="w-full hidden flex-col items-center space-y-3 pt-1">
+            
+            <!-- קונסולת המיקוד העליונה: האישון המוגדל והגירויים מופיעים ממש מתחת לעדשת המצלמה -->
+            <div class="w-full bg-slate-900/95 border-2 border-emerald-500/40 rounded-2xl p-3.5 shadow-2xl flex flex-col items-center text-center relative overflow-hidden">
+                <div class="text-[11px] font-bold text-emerald-400 tracking-wide mb-1.5 flex items-center gap-1.5">
+                    <span>⬆️ הבט לכאן (ישירות לכיוון המצלמה העליונה)</span>
+                    <span id="hw-focus-badge" class="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full font-mono">פוקוס אוטומטי</span>
+                </div>
+
+                <div class="flex items-center justify-center gap-4 w-full my-1">
+                    <!-- חלונית זום אישון מוגדלת במרכז העליון -->
+                    <div class="relative flex flex-col items-center">
+                        <canvas id="eye-zoom-canvas" width="48" height="48"></canvas>
+                        <span id="fps-live" class="mt-1 text-[10px] font-mono text-slate-400">FPS: --</span>
+                    </div>
+
+                    <!-- תיבת הגירוי וההנחיות צמודה לזום העליון כדי שהמבט לא ירד למטה -->
+                    <div class="flex-1 text-right space-y-1 pr-2 border-r border-slate-800">
+                        <div class="text-xs uppercase tracking-wider text-cyan-400 font-bold" id="phase-title">שלב הכנה ומיקוד</div>
+                        <div class="text-sm font-bold text-white leading-snug" id="phase-instruction">הבט בעיגול האישון למעלה כדי שהעפעף לא יסתיר את העין</div>
+                        <div id="stimulus-box" class="mt-2 pt-2 border-t border-slate-800/80 hidden">
+                            <div id="stimulus-content" class="text-lg font-extrabold text-amber-300"></div>
+                        </div>
+                        <div class="text-2xl font-mono font-extrabold text-emerald-400 hidden" id="phase-timer">15s</div>
+                    </div>
+                </div>
             </div>
-        </div>
-        <div id="connection-badge" class="text-xs font-mono px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-            ממתין להתחלה
-        </div>
-    </header>
 
-    <main class="w-full max-w-xl flex-1 flex flex-col items-center justify-center">
-        
+            <!-- מדדים חיים בצמוד לחלק העליון -->
+            <div class="w-full bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 grid grid-cols-3 gap-2 text-center">
+                <div>
+                    <div class="text-[10px] text-slate-400">שטח אישון כהה:</div>
+                    <div id="live-pupil-dark" class="text-xl font-mono font-bold text-emerald-400">--.-%</div>
+                </div>
+                <div>
+                    <div class="text-[10px] text-slate-400">מיקרו-תנודות (SD):</div>
+                    <div id="live-jitter" class="text-xl font-mono font-bold text-amber-400">0.00</div>
+                </div>
+                <div>
+                    <div class="text-[10px] text-slate-400">דגימות:</div>
+                    <div id="sample-counter" class="text-xl font-mono font-bold text-slate-200">0</div>
+                </div>
+            </div>
+
+            <!-- כפתור התחלה בולט בחלק העליון-אמצעי -->
+            <button id="btn-start-protocol" onclick="startProtocol()" disabled class="w-full py-3.5 bg-slate-800 text-slate-500 font-bold rounded-xl transition cursor-not-allowed">
+                ממתין לנעילה על האישון...
+            </button>
+
+            <!-- תצוגת המצלמה הכללית (למטה יותר, רק לבקרת מיקום הפנים) -->
+            <div class="video-box">
+                <video id="video" playsinline autoplay muted></video>
+                <canvas id="canvas"></canvas>
+                
+                <div class="absolute top-2.5 right-2.5 z-20 bg-slate-950/85 backdrop-blur px-3 py-1 rounded-full border border-slate-800 flex items-center gap-2">
+                    <span id="tracking-dot" class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+                    <span id="tracking-status" class="text-xs font-mono text-slate-200">טוען מודל...</span>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- כותרת עליונה (מוצגת במסך פתיחה ותוצאות) -->
+        <header id="main-header" class="w-full max-w-xl flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 font-bold">B</div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight">Beuofdbak <span class="text-xs bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full font-mono">Alpha v4.1</span></h1>
+                    <p class="text-xs text-slate-400">מיקוד מצלמה עליון + פוקוס אוטומטי רציף</p>
+                </div>
+            </div>
+            <div id="connection-badge" class="text-xs font-mono px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                ממתין להתחלה
+            </div>
+        </header>
+
         <!-- מסך 1: הגדרות נבדק -->
         <section id="screen-welcome" class="w-full bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
             <div class="space-y-2">
-                <h2 class="text-xl font-bold text-white">מעבדת כיול אישונים – גרסה 4.0 🧠👁️</h2>
+                <h2 class="text-xl font-bold text-white">מעבדת כיול אישונים – גרסה 4.1 🎯👁️</h2>
                 <p class="text-sm text-slate-300 leading-relaxed">
-                    בעקבות ממצאי סבב האלפא הראשון, גרסה זו משלבת <strong>ניתוח צפיפות פיקסלים כהים בתוך הקשתית</strong> (למדידת התרחבות וכיווץ האישון עצמו) יחד עם <strong>מדד מיקרו-תנודות עין (Jitter)</strong>.
+                    בגרסה זו <strong>אזור המיקוד והזום הועבר לראש המסך</strong> (ממש מתחת למצלמת הסלפי) כדי למנוע מהעפעפיים להסתיר את האישון, ונוסף חיבור ל<strong>פוקוס אוטומטי רציף בחומרת המצלמה</strong>.
                 </p>
                 <div class="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-xs text-amber-300">
                     💡 <strong>משתמשי אנדרואיד/סמסונג:</strong> מומלץ לפתוח קישור זה בדפדפן <strong>Chrome</strong> לביצועים מהירים פי 5.
@@ -91,7 +157,7 @@
             <div class="space-y-4 pt-2 border-t border-slate-800">
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1.5">1. שם נבדק ודגם מכשיר:</label>
-                    <input type="text" id="input-tester-name" placeholder="למשל: רפאל - גלקסי S23" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
+                    <input type="text" id="input-tester-name" placeholder="למשל: רפאל - אייפון 15" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500">
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
@@ -125,60 +191,7 @@
             </div>
 
             <button id="btn-init-camera" onclick="initializeSystem()" class="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-slate-950 font-bold rounded-xl shadow-lg transition transform active:scale-95">
-                הפעל מצלמה ומנוע דגימת אישון 📷
-            </button>
-        </section>
-
-        <!-- מסך 2: זירה פעילה -->
-        <section id="screen-test" class="w-full hidden flex-col items-center space-y-4">
-            
-            <div id="protocol-banner" class="w-full bg-slate-900 border border-slate-700 rounded-2xl p-4 text-center shadow-md">
-                <div class="text-xs uppercase tracking-wider text-emerald-400 font-semibold mb-1" id="phase-title">שלב הכנה ומיקוד</div>
-                <div class="text-base font-bold" id="phase-instruction">קרב מעט את הפנים למצלמה (25-30 ס"מ) עד שהאישון מופיע בחלונית הזום</div>
-                <div class="mt-2 text-2xl font-mono font-extrabold text-cyan-400 hidden" id="phase-timer">15s</div>
-            </div>
-
-            <div class="video-box">
-                <video id="video" playsinline autoplay muted></video>
-                <canvas id="canvas"></canvas>
-                
-                <div class="absolute top-3 right-3 z-20 bg-slate-950/85 backdrop-blur px-3 py-1 rounded-full border border-slate-800 flex items-center gap-2">
-                    <span id="tracking-dot" class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
-                    <span id="tracking-status" class="text-xs font-mono text-slate-200">טוען מודל...</span>
-                </div>
-
-                <!-- חלונית זום אישון חיה (מראה את בידוד האישון בזמן אמת) -->
-                <div class="absolute bottom-3 left-3 z-20 flex items-center gap-2 bg-slate-950/85 p-1.5 rounded-xl border border-slate-800">
-                    <canvas id="eye-zoom-canvas" width="36" height="36"></canvas>
-                    <div class="text-[10px] font-mono text-slate-300 leading-tight pr-1">
-                        <div class="text-emerald-400 font-bold">ZOOM אישון</div>
-                        <div id="fps-live">FPS: --</div>
-                    </div>
-                </div>
-
-                <div id="stimulus-overlay" class="absolute inset-0 z-20 hidden flex-col items-center justify-center bg-slate-950/35 backdrop-blur-[1px] p-4 text-center">
-                    <div id="stimulus-content" class="text-2xl font-extrabold text-white drop-shadow-lg bg-slate-900/90 border border-slate-700 px-5 py-3.5 rounded-2xl"></div>
-                </div>
-            </div>
-
-            <!-- מדדים חיים: מדד אישון כהה + יחס גיאומטרי -->
-            <div class="w-full bg-slate-900/90 border border-slate-800 rounded-2xl p-4 grid grid-cols-3 gap-2 text-center">
-                <div>
-                    <div class="text-[11px] text-slate-400">מדד התרחבות אישון (כהה):</div>
-                    <div id="live-pupil-dark" class="text-2xl font-mono font-bold text-emerald-400">--.-%</div>
-                </div>
-                <div>
-                    <div class="text-[11px] text-slate-400">יציבות / רעידות (SD):</div>
-                    <div id="live-jitter" class="text-2xl font-mono font-bold text-amber-400">0.000</div>
-                </div>
-                <div>
-                    <div class="text-[11px] text-slate-400">דגימות שנאספו:</div>
-                    <div id="sample-counter" class="text-2xl font-mono font-bold text-slate-200">0</div>
-                </div>
-            </div>
-
-            <button id="btn-start-protocol" onclick="startProtocol()" disabled class="w-full py-4 bg-slate-800 text-slate-500 font-bold rounded-xl transition cursor-not-allowed">
-                ממתין לנעילה על האישון...
+                הפעל מצלמה ופוקוס חומרתי 📷
             </button>
         </section>
 
@@ -186,8 +199,8 @@
         <section id="screen-results" class="w-full hidden bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
             <div class="text-center space-y-1">
                 <div class="inline-flex p-3 rounded-full bg-emerald-500/20 text-emerald-400 mb-1 text-2xl">📊</div>
-                <h2 class="text-xl font-bold text-white">דוח מעבדה – Alpha v4.0</h2>
-                <p class="text-xs text-slate-400">השוואת צפיפות האישון ותנודתיות העין בין 3 המצבים:</p>
+                <h2 class="text-xl font-bold text-white">דוח מעבדה – Alpha v4.1</h2>
+                <p class="text-xs text-slate-400">השוואת צפיפות האישון ותנודתיות העין (במבט ישיר למצלמה העליונה):</p>
             </div>
 
             <div class="grid grid-cols-3 gap-2 text-center">
@@ -234,8 +247,8 @@
 
     </main>
 
-    <footer class="w-full max-w-xl text-center text-[11px] text-slate-600 mt-6">
-        DUPAMAN Ecosystem • Beuofdbak Alpha v4.0 Dark-Pixel Engine
+    <footer class="w-full max-w-xl text-center text-[11px] text-slate-600 mt-4">
+        DUPAMAN Ecosystem • Beuofdbak Alpha v4.1 Top-Focus & Hardware AF
     </footer>
 
     <script>
@@ -245,7 +258,6 @@
         const zoomCanvas = document.getElementById('eye-zoom-canvas');
         const zoomCtx = zoomCanvas.getContext('2d', { willReadFrequently: true });
 
-        // קנבס נסתר לקריאת פיקסלים נקייה מתמונת הוידאו
         const offCanvas = document.createElement('canvas');
         const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
 
@@ -256,12 +268,14 @@
         const trackingStatus = document.getElementById('tracking-status');
         const btnStartProtocol = document.getElementById('btn-start-protocol');
         const fpsLiveEl = document.getElementById('fps-live');
+        const hwFocusBadge = document.getElementById('hw-focus-badge');
 
         let model = null;
         let isTracking = false;
         let smoothedDarkIndex = 0;
         let totalSamples = 0;
         let recentSamples = [];
+        let hardwareCapabilitiesLog = {};
 
         let currentPhase = 'IDLE';
         let phaseData = {
@@ -276,45 +290,81 @@
         }
 
         /**
-         * פונקציית ליבה חדשה ב-V4:
-         * מחשבת את יחס הפיקסלים הכהים (האישון השחור) מתוך אזור הקשתית (Iris ROI)
-         * תוך נרמול אוטומטי לתאורת הסביבה (יחס בהירות מרכז האישון מול שולי הקשתית)
+         * הפעלת יכולות חומרה מובנות של המצלמה (פוקוס אוטומטי רציף על אובייקטים זזים, חשיפה וזום)
          */
+        async function enableHardwareCameraFeatures(stream) {
+            try {
+                const track = stream.getVideoTracks()[0];
+                if (!track || !track.getCapabilities) {
+                    hwFocusBadge.innerText = "פוקוס סטנדרטי";
+                    return;
+                }
+
+                const caps = track.getCapabilities();
+                hardwareCapabilitiesLog = {
+                    focusModes: caps.focusMode || [],
+                    exposureModes: caps.exposureMode || [],
+                    zoomSupported: !!caps.zoom
+                };
+
+                const advConstraints = {};
+
+                // 1. הפעלת פוקוס אוטומטי רציף (עוקב אחרי תנועת הפנים והעיניים)
+                if (caps.focusMode && caps.focusMode.includes('continuous')) {
+                    advConstraints.focusMode = 'continuous';
+                }
+                // 2. הפעלת איזון חשיפה אוטומטי רציף
+                if (caps.exposureMode && caps.exposureMode.includes('continuous')) {
+                    advConstraints.exposureMode = 'continuous';
+                }
+                // 3. אם המצלמה תומכת בזום חומרתי קל, נפעיל זום עדין (1.3x) למיקוד על העיניים
+                if (caps.zoom && caps.zoom.max >= 1.3) {
+                    advConstraints.zoom = Math.min(1.3, caps.zoom.max);
+                }
+
+                if (Object.keys(advConstraints).length > 0) {
+                    await track.applyConstraints({ advanced: [advConstraints] });
+                    hwFocusBadge.innerText = "🎯 פוקוס חומרתי רציף פעיל";
+                    hwFocusBadge.className = "text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono";
+                } else {
+                    hwFocusBadge.innerText = "מצלמת קדמית מופעלת";
+                }
+            } catch (e) {
+                console.warn("Hardware constraints note:", e);
+            }
+        }
+
         function analyzePupilPixels(irisPoints) {
-            // נקודה 0 היא מרכז האישון/קשתית במודל MediaPipe Iris
             const center = irisPoints[0];
             const radius = getDistance(irisPoints[1], irisPoints[3]) / 2;
             if (radius < 3) return null;
 
-            const boxSize = Math.max(12, Math.round(radius * 2.4));
+            const SIZE = 48; // רזולוציית זום מוגדלת ב-V4.1
+            const boxSize = Math.max(14, Math.round(radius * 2.4));
             const startX = Math.max(0, Math.round(center[0] - boxSize / 2));
             const startY = Math.max(0, Math.round(center[1] - boxSize / 2));
 
-            // ציור אזור העין לקנבס הזום החי ולניתוח הפיקסלים
-            zoomCtx.clearRect(0, 0, 36, 36);
-            zoomCtx.drawImage(offCanvas, startX, startY, boxSize, boxSize, 0, 0, 36, 36);
+            zoomCtx.clearRect(0, 0, SIZE, SIZE);
+            zoomCtx.drawImage(offCanvas, startX, startY, boxSize, boxSize, 0, 0, SIZE, SIZE);
 
-            const imgData = zoomCtx.getImageData(0, 0, 36, 36).data;
+            const imgData = zoomCtx.getImageData(0, 0, SIZE, SIZE).data;
             let outerLumaSum = 0;
             let outerCount = 0;
             let innerLumaValues = [];
 
-            const cx = 18, cy = 18;
-            for (let y = 0; y < 36; y++) {
-                for (let x = 0; x < 36; x++) {
+            const cx = SIZE / 2, cy = SIZE / 2;
+            for (let y = 0; y < SIZE; y++) {
+                for (let x = 0; x < SIZE; x++) {
                     const dist = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
-                    if (dist > 16) continue; // מחוץ לעיגול הקשתית
+                    if (dist > 21) continue;
 
-                    const idx = (y * 36 + x) * 4;
-                    // חישוב בהירות פיקסל (Luminance)
+                    const idx = (y * SIZE + x) * 4;
                     const luma = 0.299 * imgData[idx] + 0.587 * imgData[idx + 1] + 0.114 * imgData[idx + 2];
 
-                    if (dist >= 11 && dist <= 16) {
-                        // טבעת חיצונית (רקמת הקשתית / לובן קרוב) כנקודת ייחוס לתאורה
+                    if (dist >= 14 && dist <= 21) {
                         outerLumaSum += luma;
                         outerCount++;
-                    } else if (dist < 11) {
-                        // אזור האישון והקשתית הפנימית
+                    } else if (dist < 14) {
                         innerLumaValues.push({ x, y, luma, idx });
                     }
                 }
@@ -322,40 +372,41 @@
 
             if (outerCount === 0 || innerLumaValues.length === 0) return null;
             const outerMeanLuma = outerLumaSum / outerCount;
-
-            // סף דינמי: פיקסל נחשב לחלק מהאישון השחור אם הוא כהה משמעותית משולי הקשתית
             const threshold = outerMeanLuma * 0.72;
             let darkPixels = 0;
 
-            // סימון ויזואלי בירוק על קנבס הזום של הפיקסלים שזוהו כאישון
-            const overlayData = zoomCtx.getImageData(0, 0, 36, 36);
+            const overlayData = zoomCtx.getImageData(0, 0, SIZE, SIZE);
             innerLumaValues.forEach(pt => {
                 if (pt.luma < threshold) {
                     darkPixels++;
-                    overlayData.data[pt.idx] = 16;     // R
-                    overlayData.data[pt.idx + 1] = 185; // G (Emerald)
-                    overlayData.data[pt.idx + 2] = 129; // B
+                    overlayData.data[pt.idx] = 16;
+                    overlayData.data[pt.idx + 1] = 185;
+                    overlayData.data[pt.idx + 2] = 129;
                 }
             });
             zoomCtx.putImageData(overlayData, 0, 0);
 
-            // אחוז שטח האישון הכהה מתוך מרכז העין (0 עד 100)
-            const darkPct = (darkPixels / innerLumaValues.length) * 100;
-            return darkPct;
+            return (darkPixels / innerLumaValues.length) * 100;
         }
 
         async function initializeSystem() {
             const btnInit = document.getElementById('btn-init-camera');
             btnInit.disabled = true;
-            btnInit.innerText = "מאתחל מצלמה ומודל WebGL...";
+            btnInit.innerText = "מאתחל מצלמה ופוקוס אוטומטי...";
 
             try {
-                // רזולוציה מותאמת (480x360) להאצת מכשירי אנדרואיד
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 360 } },
+                    video: {
+                        facingMode: 'user',
+                        width: { ideal: 480 },
+                        height: { ideal: 360 }
+                    },
                     audio: false
                 });
                 video.srcObject = stream;
+
+                // הפעלת פוקוס אוטומטי רציף בחומרת המצלמה
+                await enableHardwareCameraFeatures(stream);
 
                 await new Promise((resolve) => {
                     video.onloadedmetadata = () => {
@@ -368,6 +419,8 @@
                 });
                 video.play();
 
+                // הסתרת הכותרת העליונה כדי לקרב את חלונית האישון למצלמת הסלפי קצה-לקצה!
+                document.getElementById('main-header').classList.add('hidden');
                 document.getElementById('screen-welcome').classList.add('hidden');
                 const testScreen = document.getElementById('screen-test');
                 testScreen.classList.remove('hidden');
@@ -378,9 +431,6 @@
                     { maxFaces: 1 }
                 );
 
-                document.getElementById('connection-badge').innerText = "מנוע V4 פעיל";
-                document.getElementById('connection-badge').className = "text-xs font-mono px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
-                
                 renderPrediction();
 
             } catch (err) {
@@ -419,7 +469,6 @@
                     const rightIris = predictions[0].annotations.rightEyeIris;
                     const leftIris = predictions[0].annotations.leftEyeIris;
 
-                    // ציור טבעת סביב הקשתית
                     ctx.strokeStyle = '#10b981';
                     ctx.lineWidth = 1.5;
                     [rightIris, leftIris].forEach(iris => {
@@ -430,12 +479,10 @@
                         ctx.stroke();
                     });
 
-                    // 1. חישוב יחס גיאומטרי קלאסי (לגיבוי והשוואה ל-V3)
                     const rEyeW = getDistance(keypoints[133], keypoints[33]);
                     const rIrisW = getDistance(rightIris[1], rightIris[3]);
                     const geomRatio = rEyeW > 0 ? (rIrisW / rEyeW) : 0;
 
-                    // 2. חישוב מדד האישון הכהה החדש (Dark-Pixel Pupillometry)
                     const darkScoreR = analyzePupilPixels(rightIris);
 
                     if (darkScoreR !== null && geomRatio > 0.15 && geomRatio < 0.75) {
@@ -457,7 +504,7 @@
                             if (currentPhase === 'IDLE') {
                                 btnStartProtocol.disabled = false;
                                 btnStartProtocol.innerText = "התחל פרוטוקול בדיקה (50 שניות) ▶️";
-                                btnStartProtocol.className = "w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl shadow-lg transition cursor-pointer";
+                                btnStartProtocol.className = "w-full py-3.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl shadow-lg transition cursor-pointer";
                             }
                         }
 
@@ -485,28 +532,27 @@
             const timerEl = document.getElementById('phase-timer');
             const titleEl = document.getElementById('phase-title');
             const instrEl = document.getElementById('phase-instruction');
-            const overlay = document.getElementById('stimulus-overlay');
+            const stimulusBox = document.getElementById('stimulus-box');
             const stimulusContent = document.getElementById('stimulus-content');
 
             timerEl.classList.remove('hidden');
+            stimulusBox.classList.remove('hidden');
 
             runPhase('BASELINE', 15, () => {
                 titleEl.innerText = "שלב 1 מתוך 3: כיול מנוחה (Baseline)";
-                instrEl.innerText = "הבט בנקודה הירוקה ונשום רגוע ללא תזוזת ראש";
-                overlay.classList.remove('hidden');
-                overlay.classList.add('flex');
-                stimulusContent.innerHTML = '<div class="w-5 h-5 rounded-full bg-emerald-400 mx-auto animate-pulse"></div><div class="text-xs text-slate-300 mt-2 font-normal">מיקוד מנוחה</div>';
+                instrEl.innerText = "הבט בעיגול האישון הירוק שלידך ונשום רגוע";
+                stimulusContent.innerHTML = '<span class="text-emerald-400 text-sm">🟢 מיקוד רגוע בעיגול הזום העליון</span>';
             }, () => {
                 runPhase('STRESS', 20, () => {
                     titleEl.innerText = "שלב 2 מתוך 3: מאמץ קוגניטיבי";
-                    instrEl.innerText = "חשב בראש מהר ככל האפשר בלי להזיז את המבט:";
-                    stimulusContent.innerHTML = '<div class="text-amber-400 text-xl mb-1">400 פחות 13?</div><div class="text-xs font-normal text-slate-200">המשך לחסר 13 אחורה: 387, 374...</div>';
+                    instrEl.innerText = "המשך להביט למעלה וחשב בראש מהר:";
+                    stimulusContent.innerHTML = '<div>400 פחות 13?</div><div class="text-xs font-normal text-slate-300">המשך לחסר 13 אחורה (387, 374...)</div>';
                 }, () => {
                     runPhase('LIGHT', 15, () => {
                         document.body.classList.add('light-reflex-mode');
                         titleEl.innerText = "שלב 3 מתוך 3: רפלקס האור (OKF)";
-                        instrEl.innerText = "המסך מואר בעוצמה לבדיקת כיווץ האישון. המשך להביט למרכז.";
-                        stimulusContent.innerHTML = '<div class="text-cyan-400 text-lg">☀️ בדיקת כיווץ באור</div>';
+                        instrEl.innerText = "המסך מואר לכיווץ האישון. המשך להביט למעלה!";
+                        stimulusContent.innerHTML = '<span class="text-cyan-400">☀️ בדיקת כיווץ באור</span>';
                     }, () => {
                         document.body.classList.remove('light-reflex-mode');
                         finishProtocol();
@@ -549,6 +595,7 @@
                 video.srcObject.getTracks().forEach(track => track.stop());
             }
 
+            document.getElementById('main-header').classList.remove('hidden');
             document.getElementById('screen-test').classList.add('hidden');
             document.getElementById('screen-results').classList.remove('hidden');
 
@@ -584,8 +631,8 @@
             }
 
             const telemetryPayload = {
-                version: "Alpha-v4.0-DarkPixel",
-                test_id: "ALPHA4-" + Math.random().toString(36).substring(2, 7).toUpperCase(),
+                version: "Alpha-v4.1-TopFocus",
+                test_id: "ALPHA41-" + Math.random().toString(36).substring(2, 7).toUpperCase(),
                 timestamp: new Date().toISOString(),
                 tester: document.getElementById('input-tester-name').value || "Anonymous",
                 profile: {
@@ -597,7 +644,8 @@
                     user_agent: navigator.userAgent,
                     screen: window.screen.width + "x" + window.screen.height,
                     video_res: canvas.width + "x" + canvas.height,
-                    estimated_fps: fps
+                    estimated_fps: fps,
+                    hw_camera_caps: hardwareCapabilitiesLog
                 },
                 metrics_dark_pupil: {
                     baseline: baseDark,
@@ -625,12 +673,11 @@
             setTimeout(() => { btn.innerText = "📋 העתק נתונים (JSON)"; }, 2500);
         }
 
-        // שימוש בחיבור מחרוזות קלאסי (+) כדי למנוע תקלות העתקה ב-GitHub
         function shareViaWhatsApp() {
             const rawJson = document.getElementById('json-output').value;
             const data = JSON.parse(rawJson);
             const m = data.metrics_dark_pupil;
-            const summaryText = "*דוח בדיקת אלפא V4 - Beuofdbak* 👁️\n" +
+            const summaryText = "*דוח בדיקת אלפא V4.1 - Beuofdbak* 👁️\n" +
                 "נבדק: " + data.tester + " (" + data.test_id + ")\n" +
                 "צבע עין: " + data.profile.eye_color + " | תאורה: " + data.profile.lighting + "\n" +
                 "קצב מצלמה: " + data.device.estimated_fps + " FPS (" + data.device.video_res + ")\n" +
